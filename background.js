@@ -94,7 +94,7 @@ function setupWebSocketFrameListener() {
 
             if (opcode === 1) {
                 payloadDisplay = payloadData;
-               console.log("<<", payloadDisplay);
+            //    console.log("<<", payloadDisplay);
                 if (allbetSocket && allbetSocket.readyState === WebSocket.OPEN){
                     if (payloadDisplay.startsWith('{')) {
                         payloadDisplay = JSON.parse(payloadDisplay);
@@ -113,58 +113,66 @@ function setupWebSocketFrameListener() {
     });
 };
 function refreshAndReload(source) {
-    const tabId = source.tabId;
-
-    if (!tabId) {
-        console.warn("No tabId found in source");
-        return;
-    }
-
     // Step 1: 获取目标调试器 ID
     chrome.debugger.getTargets((targets) => {
-        const target = targets.find(t => t.id.tab === tabId);
+        const target = targets.find(t => t.type === 'page' && isGameUrl(t.url));
         if (!target) {
-            console.warn("未找到对应的目标页面或不符合游戏 URL 规则:", target?.url);
+            console.warn("未找到对应的目标页面或不符合游戏 URL 规则");
             return;
         }
 
+        // 保存 tabId（页面刷新后保持不变）
+        const tabId = target.tabId;
+        
         // Step 2: 刷新页面
-        chrome.debugger.sendCommand({ targetId: target.id }, "Page.reload", { ignoreCache: true }, () => {
-            console.log(`Tab ID: ${tabId} 页面已刷新`);
+        chrome.debugger.sendCommand(
+            { targetId: target.id }, 
+            "Page.reload", 
+            { ignoreCache: true }, 
+            () => {
+                console.log(`标签页 ${tabId} 正在刷新...`);
+                
+                // Step 3: 等待页面加载完成并执行点击逻辑
+                setTimeout(() => {
+                    const clickScript = `
+                        (function() {
+                            console.log("点击开始...");
+                            const nameElement = Array.from(
+                                document.querySelectorAll('div.name-inner')
+                            ).find(el => el.textContent && el.textContent.includes('EVO真人'));
+                            
+                            if (nameElement && nameElement.parentNode && nameElement.parentNode.parentNode) {
+                                const targetElement = nameElement.parentNode.parentNode.firstElementChild;
+                                targetElement.click();
+                                console.log('成功点击EVO真人');
+                                return true;
+                            } else {
+                                console.warn('未找到EVO真人元素');
+                                return false;
+                            }
+                        })()
+                    `;
 
-            // Step 3: 等待页面加载完成并执行点击逻辑
-            setTimeout(() => {
-                const clickScript = `
-                    (function() {
-                        const selector = 'div._list-ordinary-layout_1bihj_33 > div[data-id="5c26f779-3bf7-40a3-9b81-bb138492652e"]';
-                        const element = document.querySelector(selector);
-                        if (element) {
-                            element.click();
-                            console.log('成功点击:', selector);
-                        } else {
-                            console.warn('未找到元素:', selector);
+                    // 关键修改：使用 tabId 而不是 targetId
+                    chrome.debugger.sendCommand(
+                        { tabId: tabId }, // 使用保存的 tabId
+                        "Runtime.evaluate",
+                        { expression: clickScript },
+                        (result) => {
+                            if (chrome.runtime.lastError) {
+                                console.error("执行点击失败:", chrome.runtime.lastError.message);
+                            } else {
+                                console.log("点击脚本执行结果:", result);
+                            }
                         }
-                    })()
-                `;
-
-                chrome.debugger.sendCommand(
-                    { targetId: target.id },
-                    "Runtime.evaluate",
-                    { expression: clickScript },
-                    (result) => {
-                        if (chrome.runtime.lastError) {
-                            console.error("执行点击失败:", chrome.runtime.lastError.message);
-                        } else {
-                            console.log("点击脚本执行结果:", result);
-                        }
-                    }
-                );
-            }, 5000); // 等待 5 秒确保页面加载完成
-        });
+                    );
+                }, 8000); // 等待 8 秒确保页面加载完成
+            }
+        );
     });
 }
 chrome.storage.local.get(['gameUrlPattern'], ({ gameUrlPattern }) => {
-    urlPattern = gameUrlPattern || 'evo,chat-scroll';
+    urlPattern = gameUrlPattern || '/embedded,evo,chat-scroll';
 });
 
 // 使用存储的 gameUrlPattern 进行匹配
@@ -423,7 +431,7 @@ async function attachTab(tab){
     const script = await fetch(chrome.runtime.getURL('inject_scripts.js')).then(response => response.text());
     chrome.debugger.getTargets((targets) => {
         if (chrome.runtime.lastError) {
-            console.error('Error getting targets:', chrome.runtime.lastError);
+            console.warn('Error getting targets:', chrome.runtime.lastError);
             return;
         }
 
@@ -433,7 +441,7 @@ async function attachTab(tab){
                 // Step 2: 连接到目标
                 chrome.debugger.attach({ targetId: target.id }, "1.3", () => {
                     if (chrome.runtime.lastError) {
-                        console.error(chrome.runtime.lastError.message);
+                        console.warn(chrome.runtime.lastError.message);
                     }
                     chrome.debugger.sendCommand({ targetId: target.id }, 'Network.enable');
                     console.log(`成功连接到目标: ${target.url}`);
