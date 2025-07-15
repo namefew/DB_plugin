@@ -5,7 +5,8 @@ const maxReconnectAttempts = 5; // 最大重连次数
 const initialReconnectInterval = 1000; // 初始重连间隔时间，单位为毫秒
 let urlPattern;
 let attachedTabs = new Set(); // 用于跟踪已经附加调试器的标签页
-
+let needRefresh = false;
+let interval_id = null;
 function getWebSocket() {
     return new Promise((resolve, reject) => {
         if (allbetSocket && allbetSocket.readyState === WebSocket.OPEN) {
@@ -101,7 +102,16 @@ function setupWebSocketFrameListener() {
                         if(payloadDisplay.type){
                             allbetSocket.send(payloadData)
                             if(payloadDisplay.type === 'connection.kickout'){
-                                refreshAndReload(source)
+                                needRefresh = true
+                                if(!interval_id){
+                                   interval_id = setInterval(refreshAndReload, 30000)
+                                }
+                            }else if(needRefresh === true){
+                                needRefresh = false
+                                if(interval_id){
+                                    clearInterval(interval_id)
+                                    interval_id = null;
+                                }
                             }
                         }
                     }
@@ -112,7 +122,7 @@ function setupWebSocketFrameListener() {
         }
     });
 };
-function refreshAndReload(source) {
+function refreshAndReload() {
     // Step 1: 获取目标调试器 ID
     chrome.debugger.getTargets((targets) => {
         const target = targets.find(t => t.type === 'page' && isGameUrl(t.url));

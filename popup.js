@@ -1,17 +1,45 @@
-document.addEventListener('DOMContentLoaded', () => {
-  const messageInput = document.getElementById('message-input');
-  const sendButton = document.getElementById('send-button');
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('configForm');
+    const wsUrlInput = document.getElementById('wsUrl');
+    const amountInput = document.getElementById('amount');
+    const gameUrlPatternInput = document.getElementById('gameUrlPattern');
+    const status = document.getElementById('status');
 
-  sendButton.addEventListener('click', async () => {
-    const message = messageInput.value.trim();
-    if (message) {
-         chrome.runtime.sendMessage({ action: 'sendWebSocketMessage', message },(response)=>{
-             console.log("response ",response)
-         });
-         alert('Message sent successfully.');
-    } else {
-      alert('Please enter a message.');
-    }
-  });
+    // 加载配置项
+    chrome.storage.local.get(['wsUrl', 'amount', 'gameUrlPattern'], function(items) {
+        wsUrlInput.value = items.wsUrl || 'ws://localhost:8765/evo';
+        amountInput.value = items.amount;
+        gameUrlPatternInput.value = items.gameUrlPattern || '/embedded,evo,chat-scroll';
+    });
+
+    form.addEventListener('submit', function(event) {
+        event.preventDefault();
+
+        const wsUrl = wsUrlInput.value;
+        const amount = parseFloat(amountInput.value);
+        const gameUrlPattern = gameUrlPatternInput.value;
+
+        if (!wsUrl) {
+            status.textContent = 'WebSocket服务器地址不能为空';
+            status.style.color = 'red';
+            return;
+        }
+
+        if (isNaN(amount)) {
+            status.textContent = '金额必须是数字';
+            status.style.color = 'red';
+            return;
+        }
+
+        if (!gameUrlPattern) {
+            status.textContent = '游戏URL特征不能为空';
+            status.style.color = 'red';
+            return;
+        }
+
+        chrome.storage.local.set({ wsUrl, amount, gameUrlPattern }, function() {
+            status.textContent = '配置保存成功';
+            status.style.color = 'green';
+        });
+    });
 });
-
