@@ -1,32 +1,23 @@
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('configForm');
     const wsUrlInput = document.getElementById('wsUrl');
-    const amountInput = document.getElementById('amount');
     const gameUrlPatternInput = document.getElementById('gameUrlPattern');
     const status = document.getElementById('status');
 
     // 加载配置项
-    chrome.storage.local.get(['wsUrl', 'amount', 'gameUrlPattern'], function(items) {
+    chrome.storage.local.get(['wsUrl', 'gameUrlPattern'], function(items) {
         wsUrlInput.value = items.wsUrl || 'ws://localhost:8765/evo';
-        amountInput.value = items.amount;
-        gameUrlPatternInput.value = items.gameUrlPattern || '/embedded,evo,chat-scroll';
+        gameUrlPatternInput.value = items.gameUrlPattern || '888,evo,chat-scroll';
     });
 
     form.addEventListener('submit', function(event) {
         event.preventDefault();
 
         const wsUrl = wsUrlInput.value;
-        const amount = parseFloat(amountInput.value);
         const gameUrlPattern = gameUrlPatternInput.value;
 
         if (!wsUrl) {
             status.textContent = 'WebSocket服务器地址不能为空';
-            status.style.color = 'red';
-            return;
-        }
-
-        if (isNaN(amount)) {
-            status.textContent = '金额必须是数字';
             status.style.color = 'red';
             return;
         }
@@ -37,7 +28,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        chrome.storage.local.set({ wsUrl, amount, gameUrlPattern }, function() {
+        chrome.storage.local.set({ wsUrl, gameUrlPattern }, function() {
             status.textContent = '配置保存成功';
             status.style.color = 'green';
         });

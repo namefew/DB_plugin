@@ -104,7 +104,7 @@ function setupWebSocketFrameListener() {
                             if(payloadDisplay.type === 'connection.kickout'){
                                 needRefresh = true
                                 if(!interval_id){
-                                   interval_id = setInterval(refreshAndReload, 30000)
+                                   interval_id = setInterval(refreshAndReload, 100000)
                                 }
                             }else if(needRefresh === true){
                                 needRefresh = false
@@ -144,38 +144,7 @@ function refreshAndReload() {
                 
                 // Step 3: 等待页面加载完成并执行点击逻辑
                 setTimeout(() => {
-                    const clickScript = `
-                        (function() {
-                            console.log("点击开始...");
-                            const nameElement = Array.from(
-                                document.querySelectorAll('div.name-inner')
-                            ).find(el => el.textContent && el.textContent.includes('EVO真人'));
-                            
-                            if (nameElement && nameElement.parentNode && nameElement.parentNode.parentNode) {
-                                const targetElement = nameElement.parentNode.parentNode.firstElementChild;
-                                targetElement.click();
-                                console.log('成功点击EVO真人');
-                                return true;
-                            } else {
-                                console.warn('未找到EVO真人元素');
-                                return false;
-                            }
-                        })()
-                    `;
-
-                    // 关键修改：使用 tabId 而不是 targetId
-                    chrome.debugger.sendCommand(
-                        { tabId: tabId }, // 使用保存的 tabId
-                        "Runtime.evaluate",
-                        { expression: clickScript },
-                        (result) => {
-                            if (chrome.runtime.lastError) {
-                                console.error("执行点击失败:", chrome.runtime.lastError.message);
-                            } else {
-                                console.log("点击脚本执行结果:", result);
-                            }
-                        }
-                    );
+                   clickEVO(tabId);
                 }, 8000); // 等待 8 秒确保页面加载完成
             }
         );
@@ -185,6 +154,40 @@ chrome.storage.local.get(['gameUrlPattern'], ({ gameUrlPattern }) => {
     urlPattern = gameUrlPattern || '/embedded,evo,chat-scroll';
 });
 
+function clickEVO(tabId) { 
+     const clickScript = `
+        (function() {
+            console.log("点击开始...");
+            const nameElement = Array.from(
+                document.querySelectorAll('div.name-inner')
+            ).find(el => el.textContent && el.textContent.includes('EVO真人'));
+            
+            if (nameElement && nameElement.parentNode && nameElement.parentNode.parentNode) {
+                const targetElement = nameElement.parentNode.parentNode.firstElementChild;
+                targetElement.click();
+                console.log('成功点击EVO真人');
+                return true;
+            } else {
+                console.warn('未找到EVO真人元素');
+                return false;
+            }
+        })()
+    `;
+
+    // 关键修改：使用 tabId 而不是 targetId
+    chrome.debugger.sendCommand(
+        { tabId: tabId }, // 使用保存的 tabId
+        "Runtime.evaluate",
+        { expression: clickScript },
+        (result) => {
+            if (chrome.runtime.lastError) {
+                console.error("执行点击失败:", chrome.runtime.lastError.message);
+            } else {
+                console.log("点击脚本执行结果:", result);
+            }
+        }
+    );
+}
 // 使用存储的 gameUrlPattern 进行匹配
 function isGameUrl(url) {
     let mt = false;
@@ -345,98 +348,17 @@ function inject_scripts(target, script) {
 
     });
 }
-function setBreak(target) {
-    chrome.debugger.sendCommand({ targetId: target.id }, 'Debugger.setBreakpointByUrl', {
-        lineNumber: 41,
-        columnNumber: 41525,
-        urlRegex: '.*/video/assets/_nexus-.*\\.js(\\?.*)?',
-        condition: ""
-    }, (breakpoint) => {
-        if (chrome.runtime.lastError) {
-            console.error("设置断点失败：", chrome.runtime.lastError.message);
-            return;
-        }
-
-        const currentBreakpointId = breakpoint.breakpointId;
-        console.log('断点设置成功:', currentBreakpointId, target.url);
-
-        // 监听暂停事件并关联上下文
-        const onPaused = (source, method, params) => {
-            if (method === 'Debugger.paused') {
-                const topCallFrame = params.callFrames[0];
-                if (!topCallFrame) return;
-
-                // 直接使用 callFrameId 执行代码
-                handleBreak(target, currentBreakpointId, topCallFrame.callFrameId);
-            }
-        };
-
-        chrome.debugger.onEvent.addListener(onPaused);
-    });
-}
-
-function handleBreak(target, currentBreakpointId,callFrameId) {
-    try {
-        console.info("执行到断点 ...",target.url);
-        // 执行你的自定义代码
-        script = 'console.info("断点执行:",this);if(WSNet&&this.IS_LOGIN){self.wsNet=this;console.info(self.wsNet);console.info("设置wsNet成功");a = true;}else{ console.info("设置wsNet失败");a = false;}';
-        console.info("执行自定义代码...", script, target.url);
-        chrome.debugger.sendCommand({ targetId: target.id }, "Debugger.evaluateOnCallFrame", {
-            expression: script,
-            callFrameId: callFrameId
-        }, (result) => {
-            if (chrome.runtime.lastError) {
-                console.error("",chrome.runtime.lastError.message);
-                return;
-            }
-            console.log('执行自定义代码成功:', result);
-            if(result.result.value){
-                 // 移除断点
-                console.info("移除断点...", currentBreakpointId, target.url);
-                chrome.debugger.sendCommand({
-                        targetId: target.id
-                    }, 'Debugger.removeBreakpoint', {
-                        breakpointId: currentBreakpointId
-                    }, (result1) => {
-                        if (chrome.runtime.lastError) {
-                            console.error(chrome.runtime.lastError.message);
-                        }
-                        console.info("恢复执行...", target.url);
-                        chrome.debugger.sendCommand({
-                            targetId: target.id
-                        }, 'Debugger.resume', () => {
-                            if (chrome.runtime.lastError) {
-                                console.error(chrome.runtime.lastError.message);
-                            }
-                            console.info("恢复执行完成", target.url);
-                        });
-                    });
-            }else{
-                console.info("恢复执行...", target.url);
-                chrome.debugger.sendCommand({
-                    targetId: target.id
-                }, 'Debugger.resume', () => {
-                    if (chrome.runtime.lastError) {
-                        console.error(chrome.runtime.lastError.message);
-                    }
-                    console.info("恢复执行完成", target.url);
-                });
-            }
-         });
-
-    } catch (error) {
-        console.error('Breakpoint handler error:', error);
-    }
-}
 
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     if (changeInfo.status === 'complete') {
        await attachTab(tab);
+       setTimeout(()=>{
+           clickEVO(tabId);
+       },1000);
     }
 });
 
 async function attachTab(tab){
-
 
     const script = await fetch(chrome.runtime.getURL('inject_scripts.js')).then(response => response.text());
     chrome.debugger.getTargets((targets) => {

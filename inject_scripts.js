@@ -51,7 +51,7 @@
         clearInterval(self.interval_id);
         console.log('Periodic click task has been cancelled.');
     }
-    self.interval_id = setInterval(periodicClick, 10000); // 每 10 秒点击一次
+    self.interval_id = setInterval(periodicClick, 15000); // 每 10 秒点击一次
 
     console.info('injecting scripts successfully.');
     return true;
