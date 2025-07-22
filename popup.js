@@ -6,8 +6,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 加载配置项
     chrome.storage.local.get(['wsUrl', 'gameUrlPattern'], function(items) {
-        wsUrlInput.value = items.wsUrl || 'ws://localhost:8765/evo';
-        gameUrlPatternInput.value = items.gameUrlPattern || '888,evo,chat-scroll';
+        wsUrlInput.value = items.wsUrl || 'ws://localhost:8765/db';
+        gameUrlPatternInput.value = items.gameUrlPattern || '888,egret';
     });
 
     form.addEventListener('submit', function(event) {

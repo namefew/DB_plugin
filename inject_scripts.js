@@ -4,33 +4,6 @@
     }
 
     var roulette = false;
-
-    // === 新增：定期点击“轮盘”和“百家乐&骰宝”功能 ===
-
-    function clickSvgElement(svgSelector) {
-        const svgElement = document.querySelector(svgSelector);
-        if (svgElement) {
-            // 触发 mousedown 和 mouseup 事件来模拟点击
-            const eventMouseDown = new MouseEvent('mousedown', {
-                bubbles: true,
-                cancelable: true,
-                view: window
-            });
-            svgElement.dispatchEvent(eventMouseDown);
-
-            const eventMouseUp = new MouseEvent('mouseup', {
-                bubbles: true,
-                cancelable: true,
-                view: window
-            });
-            svgElement.dispatchEvent(eventMouseUp);
-
-            console.log("Clicked element:", svgElement);
-        } else {
-            console.error("element not found for selector:", svgSelector);
-        }
-    }
-
     function periodicClick() {
         if (roulette) {
             // 点击“轮盘”相关的 SVG 元素
@@ -51,7 +24,7 @@
         clearInterval(self.interval_id);
         console.log('Periodic click task has been cancelled.');
     }
-    self.interval_id = setInterval(periodicClick, 15000); // 每 10 秒点击一次
+    // self.interval_id = setInterval(periodicClick, 15000); // 每 10 秒点击一次
 
     console.info('injecting scripts successfully.');
     return true;

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "EVO Data Collector",
+  "name": "DB Data Collector",
   "version": "1.0",
-  "description": "Collect EVO game data and send to server.",
+  "description": "Collect DB game data and send to server.",
   "permissions": ["activeTab", "webNavigation","webRequest", "tabs","debugger","storage", "scripting"],
   "host_permissions": ["<all_urls>"],
   "background": {
@@ -23,7 +23,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["websocketSendMessage.js"],
+      "resources": [],
       "matches": ["<all_urls>"]
     }
   ]

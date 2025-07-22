@@ -27,7 +27,7 @@ function getWebSocket() {
         const createAndInitializeWebSocket = () => {
             chrome.storage.local.get(['wsUrl'], ({ wsUrl }) => {
                 console.info('configured WebSocket URL:', wsUrl);
-                const url = wsUrl || 'ws://localhost:8765/evo'; // 替换为实际的 WebSocket 服务端 URL
+                const url = wsUrl || 'ws://localhost:8765/db'; // 替换为实际的 WebSocket 服务端 URL
                 const socket = new WebSocket(url);
 
                 socket.addEventListener('open', function(event) {
@@ -95,7 +95,7 @@ function setupWebSocketFrameListener() {
 
             if (opcode === 1) {
                 payloadDisplay = payloadData;
-            //    console.log("<<", payloadDisplay);
+                console.log("<<", payloadDisplay);
                 if (allbetSocket && allbetSocket.readyState === WebSocket.OPEN){
                     if (payloadDisplay.startsWith('{')) {
                         payloadDisplay = JSON.parse(payloadDisplay);
@@ -117,6 +117,64 @@ function setupWebSocketFrameListener() {
                     }
 
                 }
+            }else{
+                
+            const script = `
+                (function() {
+                    if (window.DataHandle==undefined)return '';
+                    // 接收传入的 Base64 字符串
+                    const base64Data = "${payloadData.replace(/"/g, '\\"')}";
+
+                    // Base64 解码函数
+                    function base64ToArrayBuffer(base64) {
+                        const binaryString = window.atob(base64);
+                        const len = binaryString.length;
+                        const bytes = new Uint8Array(len);
+                        for (let i = 0; i < len; i++) {
+                            bytes[i] = binaryString.charCodeAt(i);
+                        }
+                        return bytes.buffer;
+                    }
+
+                    // 解码并转换为 Uint8Array
+                    const arrayBuffer = base64ToArrayBuffer(base64Data);
+                    const payloadArray = new Uint8Array(arrayBuffer);
+
+                    // 执行解密
+                    // console.log('DataHandle:', DataHandle);
+                    const decryptedData = DataHandle.decryptWsData(payloadArray, 'ED7AA06BD8628B55');
+
+                    // 返回 JSON 字符串
+                    // return JSON.stringify(decryptedData);
+                    return decryptedData;
+                })()
+                `;
+                chrome.debugger.sendCommand(
+                    { targetId: source.targetId },
+                    "Runtime.evaluate",
+                    { expression: script },
+                    (result) => {
+                        if (chrome.runtime.lastError) {
+                            console.error("执行解密脚本失败:", chrome.runtime.lastError.message);
+                            return;
+                        }
+
+                        if (result.result && result.result.value) {
+                            const decryptedJsonStr = result.result.value;
+                            if(decryptedJsonStr=="")return;
+                            console.info("解密结果:", decryptedJsonStr);
+                            // 将结果转发到服务端
+                            if (allbetSocket && allbetSocket.readyState === WebSocket.OPEN) {
+                                allbetSocket.send(decryptedJsonStr);
+                            } else {
+                                console.warn("WebSocket 不可用，无法发送解密结果");
+                            }
+                        } else {
+                            console.warn("未获取到解密结果");
+                        }
+                    }
+                );
+                        
             }
 
         }
@@ -144,31 +202,31 @@ function refreshAndReload() {
                 
                 // Step 3: 等待页面加载完成并执行点击逻辑
                 setTimeout(() => {
-                   clickEVO(tabId);
+                   clickDB(tabId);
                 }, 8000); // 等待 8 秒确保页面加载完成
             }
         );
     });
 }
 chrome.storage.local.get(['gameUrlPattern'], ({ gameUrlPattern }) => {
-    urlPattern = gameUrlPattern || '/embedded,evo,chat-scroll';
+    urlPattern = gameUrlPattern || '/888,egret';
 });
 
-function clickEVO(tabId) { 
+function clickDB(tabId) { 
      const clickScript = `
         (function() {
             console.log("点击开始...");
             const nameElement = Array.from(
                 document.querySelectorAll('div.name-inner')
-            ).find(el => el.textContent && el.textContent.includes('EVO真人'));
+            ).find(el => el.textContent && el.textContent.includes('DB真人'));
             
             if (nameElement && nameElement.parentNode && nameElement.parentNode.parentNode) {
                 const targetElement = nameElement.parentNode.parentNode.firstElementChild;
                 targetElement.click();
-                console.log('成功点击EVO真人');
+                console.log('成功点击DB真人');
                 return true;
             } else {
-                console.warn('未找到EVO真人元素');
+                console.warn('未找到DB真人元素');
                 return false;
             }
         })()
@@ -241,7 +299,6 @@ function handleServerMessage(message) {
 
 }
 
-// 在所有附加的标签页中执行 handleMessage 函数
 async function executeScriptInTabs(script) {
 
     // 获取所有调试目标
@@ -352,9 +409,11 @@ function inject_scripts(target, script) {
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     if (changeInfo.status === 'complete') {
        await attachTab(tab);
-       setTimeout(()=>{
-           clickEVO(tabId);
-       },1000);
+       if(isGameUrl(tab.url)){
+            setTimeout(()=>{
+                clickDB(tabId);
+            },1000);
+       }
     }
 });
 
